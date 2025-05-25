@@ -41,6 +41,7 @@ def estimate_demand(df):
         return None
     return df['Demand'].mean()
 
+st.set_page_config(layout="wide")
 st.title("📊 Campaign Estimator")
 
 uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
@@ -48,7 +49,7 @@ uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
 if uploaded_file:
     try:
         df = load_data(uploaded_file)
-        required_cols = {'Country', 'Description', 'Date Start', 'Date End', 'Demand'}
+        required_cols = {'Country', 'Description', 'Date Start', 'Date End', 'Demand', 'Campaign name'}
         if not required_cols.issubset(df.columns):
             st.error(f"❌ Missing required columns: {required_cols - set(df.columns)}")
         else:
@@ -79,31 +80,33 @@ if uploaded_file:
                 earlier_df = filter_data(df, selected_country, campaign_filter, earlier_start, earlier_end)
                 later_df = filter_data(df, selected_country, campaign_filter, later_start, later_end)
 
-                st.markdown("#### Earlier Period Campaigns")
-                if earlier_df.empty:
-                    st.warning("⚠️ No campaigns found in Earlier Period with the filter.")
-                    earlier_selected = []
-                else:
-                    st.dataframe(earlier_df)
-                    st.markdown("Select campaigns to include from Earlier Period:")
-                    earlier_selected = []
-                    for idx, row in earlier_df.iterrows():
-                        label = f"{row['Description']} | {row['Date Start'].date()} - {row['Date End'].date()} | Demand: {row['Demand']:.2f}"
-                        if st.checkbox(label, value=True, key=f"earlier_{idx}"):
-                            earlier_selected.append(idx)
+                # Funkcja pomocnicza do wyboru kampanii z checkboxami po prawej
+                def select_campaigns(df, period_name):
+                    if df.empty:
+                        st.warning(f"⚠️ No campaigns found in {period_name} with the filter.")
+                        return []
+                    
+                    st.markdown(f"#### {period_name} Campaigns")
+                    # Pokazujemy pełne dane w tabeli
+                    st.dataframe(df.reset_index(drop=True))
 
-                st.markdown("#### Later Period Campaigns")
-                if later_df.empty:
-                    st.warning("⚠️ No campaigns found in Later Period with the filter.")
-                    later_selected = []
-                else:
-                    st.dataframe(later_df)
-                    st.markdown("Select campaigns to include from Later Period:")
-                    later_selected = []
-                    for idx, row in later_df.iterrows():
-                        label = f"{row['Description']} | {row['Date Start'].date()} - {row['Date End'].date()} | Demand: {row['Demand']:.2f}"
-                        if st.checkbox(label, value=True, key=f"later_{idx}"):
-                            later_selected.append(idx)
+                    st.markdown(f"Select campaigns to include from {period_name}:")
+                    selected_indices = []
+
+                    # Wyświetlamy wiersz po wierszu z checkboxem po prawej
+                    for i, row in df.iterrows():
+                        cols = st.columns([0.95, 0.05])
+                        with cols[0]:
+                            st.write(f"**{row['Description']}** | Campaign: **{row.get('Campaign name', 'N/A')}** | "
+                                     f"{row['Date Start'].date()} - {row['Date End'].date()} | Demand: {row['Demand']:.2f}")
+                        with cols[1]:
+                            checked = st.checkbox("", value=True, key=f"{period_name}_{i}")
+                            if checked:
+                                selected_indices.append(i)
+                    return selected_indices
+
+                earlier_selected = select_campaigns(earlier_df, "Earlier Period")
+                later_selected = select_campaigns(later_df, "Later Period")
 
                 if st.button("📈 Calculate Estimation"):
                     if not earlier_selected or not later_selected:
