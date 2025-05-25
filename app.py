@@ -84,9 +84,7 @@ if uploaded_file:
                     st.warning("⚠️ No campaigns found in Earlier Period with the filter.")
                     earlier_selected = []
                 else:
-                    st.dataframe(earlier_df)  # pokażemy całą tabelę
-                    
-                    # Checkboxy do wyboru kampanii
+                    st.dataframe(earlier_df)
                     st.markdown("Select campaigns to include from Earlier Period:")
                     earlier_selected = []
                     for idx, row in earlier_df.iterrows():
@@ -99,8 +97,7 @@ if uploaded_file:
                     st.warning("⚠️ No campaigns found in Later Period with the filter.")
                     later_selected = []
                 else:
-                    st.dataframe(later_df)  # pokażemy całą tabelę
-
+                    st.dataframe(later_df)
                     st.markdown("Select campaigns to include from Later Period:")
                     later_selected = []
                     for idx, row in later_df.iterrows():
@@ -131,12 +128,6 @@ if uploaded_file:
                             ''')
 
                             st.success(f"📊 Estimated Demand: **{final_estimation:.2f} EUR**")
-
-                            st.markdown("#### Used Earlier Period Campaigns:")
-                            st.dataframe(filtered_earlier)
-
-                            st.markdown("#### Used Later Period Campaigns:")
-                            st.dataframe(filtered_later)
 
                             combined_df = pd.concat([filtered_earlier, filtered_later])
                             csv = combined_df.to_csv(index=False).encode('utf-8')
