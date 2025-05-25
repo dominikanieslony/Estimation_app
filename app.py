@@ -80,29 +80,26 @@ if uploaded_file:
                 earlier_df = filter_data(df, selected_country, campaign_filter, earlier_start, earlier_end)
                 later_df = filter_data(df, selected_country, campaign_filter, later_start, later_end)
 
-                # Funkcja pomocnicza do wyboru kampanii z checkboxami po prawej
                 def select_campaigns(df, period_name):
                     if df.empty:
                         st.warning(f"⚠️ No campaigns found in {period_name} with the filter.")
                         return []
                     
                     st.markdown(f"#### {period_name} Campaigns")
-                    # Pokazujemy pełne dane w tabeli
                     st.dataframe(df.reset_index(drop=True))
 
                     st.markdown(f"Select campaigns to include from {period_name}:")
                     selected_indices = []
 
-                    # Wyświetlamy wiersz po wierszu z checkboxem po prawej
                     for i, row in df.iterrows():
-                        cols = st.columns([0.95, 0.05])
+                        cols = st.columns([0.05, 0.95])
                         with cols[0]:
+                            checked = st.checkbox("", value=True, key=f"{period_name}_{i}")
+                        with cols[1]:
                             st.write(f"**{row['Description']}** | Campaign: **{row.get('Campaign name', 'N/A')}** | "
                                      f"{row['Date Start'].date()} - {row['Date End'].date()} | Demand: {row['Demand']:.2f}")
-                        with cols[1]:
-                            checked = st.checkbox("", value=True, key=f"{period_name}_{i}")
-                            if checked:
-                                selected_indices.append(i)
+                        if checked:
+                            selected_indices.append(i)
                     return selected_indices
 
                 earlier_selected = select_campaigns(earlier_df, "Earlier Period")
