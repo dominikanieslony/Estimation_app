@@ -27,8 +27,9 @@ def clean_demand_column(df):
 def filter_data(df, country, campaign_filter, start_date, end_date):
     df_filtered = df[df['Country'] == country].copy()
     if campaign_filter and len(campaign_filter) >= 3:
-        # Wyszukiwanie po kolumnie 'Description'
-        df_filtered = df_filtered[df_filtered['Description'].str.contains(campaign_filter, case=False, na=False)]
+        mask_desc = df_filtered['Description'].str.contains(campaign_filter, case=False, na=False)
+        mask_camp = df_filtered['Campaign name'].str.contains(campaign_filter, case=False, na=False)
+        df_filtered = df_filtered[mask_desc | mask_camp]
     df_filtered['Date Start'] = pd.to_datetime(df_filtered['Date Start'], dayfirst=True, errors='coerce')
     df_filtered['Date End'] = pd.to_datetime(df_filtered['Date End'], dayfirst=True, errors='coerce')
     df_filtered = df_filtered[
@@ -96,7 +97,6 @@ if uploaded_file:
             later_filtered = reorder_columns(later_filtered)
 
             st.subheader("Select campaigns to include from Earlier Period:")
-            # Checkboxy - lista wierszy z kampaniami, wszystkie domyślnie zaznaczone
             earlier_selections = {}
             for idx, row in earlier_filtered.iterrows():
                 label = f"{row['Campaign name']} | {row['Description']} | Start: {row['Date Start'].date()} | End: {row['Date End'].date()} | Demand: {row['Demand']}"
@@ -108,7 +108,6 @@ if uploaded_file:
                 label = f"{row['Campaign name']} | {row['Description']} | Start: {row['Date Start'].date()} | End: {row['Date End'].date()} | Demand: {row['Demand']}"
                 later_selections[idx] = st.checkbox(label, value=True, key=f"later_{idx}")
 
-            # Wybrane kampanie to te, których checkbox jest zaznaczony
             earlier_selected_df = earlier_filtered.loc[[idx for idx, checked in earlier_selections.items() if checked]]
             later_selected_df = later_filtered.loc[[idx for idx, checked in later_selections.items() if checked]]
 
