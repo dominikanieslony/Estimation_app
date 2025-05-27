@@ -3,15 +3,16 @@ import pandas as pd
 import chardet
 from datetime import datetime
 
-# Load data with encoding detection
+# Wczytywanie danych z automatycznym wykrywaniem kodowania
 def load_data(uploaded_file):
     raw = uploaded_file.read()
     encoding = chardet.detect(raw)['encoding']
     uploaded_file.seek(0)
+
     df = pd.read_csv(uploaded_file, encoding=encoding, sep='\t', dayfirst=True)
     return df
 
-# Clean 'Demand' column
+# Czyszczenie kolumny 'Demand'
 def clean_demand_column(df):
     def parse_demand(val):
         if pd.isna(val):
@@ -27,10 +28,11 @@ def clean_demand_column(df):
     df['Demand'] = df['Demand'].apply(parse_demand)
     return df
 
-# Filter data for a date range
-def filter_data(df, country, campaign_keyword, start_date, end_date):
+# Filtrowanie danych według kryteriów (country, campaign contains, daty)
+def filter_data(df, country, campaign_filter, start_date, end_date):
     df_filtered = df[df['Country'] == country].copy()
-    df_filtered = df_filtered[df_filtered['Description'].str.contains(campaign_keyword, na=False, case=False)]
+    if campaign_filter:
+        df_filtered = df_filtered[df_filtered['Description'].str.contains(campaign_filter, case=False, na=False)]
 
     df_filtered['Date Start'] = pd.to_datetime(df_filtered['Date Start'], dayfirst=True, errors='coerce')
     df_filtered['Date End'] = pd.to_datetime(df_filtered['Date End'], dayfirst=True, errors='coerce')
@@ -41,10 +43,34 @@ def filter_data(df, country, campaign_keyword, start_date, end_date):
     ]
     return df_filtered
 
-# Streamlit UI
-st.title("📊 Campaign Demand Estimator")
+# Estymacja na podstawie dwóch okresów i procentowego wzrostu
+def estimate_demand(earlier_df, later_df, percentage):
+    earlier_mean = earlier_df['Demand'].mean() if not earlier_df.empty else 0
+    later_mean = later_df['Demand'].mean() if not later_df.empty else 0
+    adjusted_earlier = earlier_mean * (1 + percentage / 100)
+    if earlier_df.empty and later_df.empty:
+        return None
+    elif earlier_df.empty:
+        return later_mean
+    elif later_df.empty:
+        return adjusted_earlier
+    else:
+        return (adjusted_earlier + later_mean) / 2
 
-uploaded_file = st.file_uploader("Upload CSV campaign data", type="csv")
+# Funkcja do przestawienia kolumn: Description zaraz po Campaign name
+def reorder_columns(df):
+    cols = df.columns.tolist()
+    if 'Campaign name' in cols and 'Description' in cols:
+        cols.remove('Description')
+        idx = cols.index('Campaign name') + 1
+        cols.insert(idx, 'Description')
+        return df[cols]
+    return df
+
+# Streamlit UI
+st.title("📊 Marketing Campaign Estimator")
+
+uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
 
 if uploaded_file:
     try:
@@ -59,71 +85,70 @@ if uploaded_file:
             country_list = df['Country'].dropna().unique().tolist()
             selected_country = st.selectbox("🌍 Select country:", country_list)
 
-            campaign_name = st.text_input("🏷️ Campaign keyword (min. 3 characters):")
+            earlier_campaign_filter = st.text_input("🔎 Filter campaigns in Earlier Period (contains):")
+            later_campaign_filter = st.text_input("🔎 Filter campaigns in Later Period (contains):")
 
-            if campaign_name and len(campaign_name) >= 3:
-                st.subheader("📆 Define Time Periods")
+            st.subheader("⏳ Earlier Period")
+            earlier_start_date = st.date_input("Start date (Earlier Period):", key='earlier_start')
+            earlier_end_date = st.date_input("End date (Earlier Period):", key='earlier_end')
 
-                st.markdown("### 🕒 Earlier Period")
-                earlier_start = st.date_input("Start date (Earlier Period)", key='start1')
-                earlier_end = st.date_input("End date (Earlier Period)", key='end1')
+            st.subheader("📈 Target growth from Earlier Period (%)")
+            target_growth = st.number_input("Enter growth percentage (integer, no commas):", min_value=0, max_value=1000, step=1, format="%d")
 
-                growth_percent = st.number_input(
-                    "🌟 Target growth from Earlier Period (%)",
-                    min_value=0,
-                    max_value=100,
-                    value=0,
-                    step=1
-                )
+            st.subheader("⏳ Later Period")
+            later_start_date = st.date_input("Start date (Later Period):", key='later_start')
+            later_end_date = st.date_input("End date (Later Period):", key='later_end')
 
-                st.markdown("### 🕒 Later Period")
-                later_start = st.date_input("Start date (Later Period)", key='start2')
-                later_end = st.date_input("End date (Later Period)", key='end2')
+            # Filtracja danych na podstawie podanych dat i filtrów kampanii
+            earlier_filtered = filter_data(df, selected_country, earlier_campaign_filter, earlier_start_date, earlier_end_date)
+            later_filtered = filter_data(df, selected_country, later_campaign_filter, later_start_date, later_end_date)
 
-                if st.button("📈 Calculate Estimation"):
-                    df_earlier = filter_data(df, selected_country, campaign_name, earlier_start, earlier_end)
-                    df_later = filter_data(df, selected_country, campaign_name, later_start, later_end)
+            # Reorder columns for display
+            earlier_filtered_display = reorder_columns(earlier_filtered)
+            later_filtered_display = reorder_columns(later_filtered)
 
-                    # Campaign selection UI
-                    st.markdown("---")
-                    st.markdown("#### ✅ Select campaigns to include from Earlier Period:")
-                    selected_earlier = []
-                    for i, row in df_earlier.iterrows():
-                        label = f"{row['Campaign name']} | {row['Date Start'].date()} → {row['Date End'].date()} | Demand: {row['Demand']} | {row['Description']}"
-                        if st.checkbox(label, key=f"early_{i}", value=True):
-                            selected_earlier.append(row)
+            # Select campaigns to include - domyślnie wszystkie zaznaczone
+            st.subheader("Select campaigns to include from Earlier Period:")
+            earlier_selected_campaigns = st.multiselect(
+                "Choose campaigns from Earlier Period:",
+                options=earlier_filtered_display['Campaign name'].tolist(),
+                default=earlier_filtered_display['Campaign name'].tolist()
+            )
+            earlier_selected_df = earlier_filtered_display[earlier_filtered_display['Campaign name'].isin(earlier_selected_campaigns)]
 
-                    st.markdown("#### ✅ Select campaigns to include from Later Period:")
-                    selected_later = []
-                    for i, row in df_later.iterrows():
-                        label = f"{row['Campaign name']} | {row['Date Start'].date()} → {row['Date End'].date()} | Demand: {row['Demand']} | {row['Description']}"
-                        if st.checkbox(label, key=f"late_{i}", value=True):
-                            selected_later.append(row)
+            st.subheader("Select campaigns to include from Later Period:")
+            later_selected_campaigns = st.multiselect(
+                "Choose campaigns from Later Period:",
+                options=later_filtered_display['Campaign name'].tolist(),
+                default=later_filtered_display['Campaign name'].tolist()
+            )
+            later_selected_df = later_filtered_display[later_filtered_display['Campaign name'].isin(later_selected_campaigns)]
 
-                    # Perform estimation
-                    if not selected_later:
-                        st.warning("⚠️ You must select at least one campaign from the Later Period.")
+            if st.button("📈 Calculate Estimation"):
+                if earlier_selected_df.empty and later_selected_df.empty:
+                    st.warning("⚠️ No campaigns selected in either period for estimation.")
+                else:
+                    estimation = estimate_demand(earlier_selected_df, later_selected_df, target_growth)
+                    if estimation is None:
+                        st.warning("⚠️ Unable to calculate estimation with the given data.")
                     else:
-                        df_earlier_selected = pd.DataFrame(selected_earlier) if selected_earlier else pd.DataFrame(columns=df.columns)
-                        df_later_selected = pd.DataFrame(selected_later)
+                        st.success(f"Estimated Demand: **{estimation:.2f} EUR**")
+                        st.markdown("### Data used for estimation:")
 
-                        earlier_mean = df_earlier_selected['Demand'].mean() if not df_earlier_selected.empty else 0
-                        adjusted_earlier = earlier_mean * (1 + (growth_percent / 100))
-                        later_mean = df_later_selected['Demand'].mean()
+                        st.write("Earlier Period Campaigns:")
+                        st.dataframe(earlier_selected_df)
 
-                        final_estimation = (adjusted_earlier + later_mean) / 2
+                        st.write("Later Period Campaigns:")
+                        st.dataframe(later_selected_df)
 
-                        st.success(f"📊 Estimated Demand: **{final_estimation:.2f} EUR**")
-
-                        st.markdown("""
-                        ### 📊 Estimation Formula:
-
-                        *Adjusted Earlier* = Earlier Mean × (1 + percentage / 100)  
-                        *Final Estimation* = (Adjusted Earlier + Later Mean) / 2
-                        """)
-
-            else:
-                st.info("ℹ️ Please enter at least 3 characters for the campaign keyword.")
-
+                        # Przygotowanie do pobrania CSV z wybranymi kampaniami
+                        combined_df = pd.concat([earlier_selected_df, later_selected_df]).drop_duplicates()
+                        csv = combined_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Download selected campaigns data as CSV",
+                            data=csv,
+                            file_name='campaign_estimation_data.csv',
+                            mime='text/csv'
+                        )
     except Exception as e:
-        st.error(f"❌ Error processing the file: {e}")
+        st.error(f"❌ Error processing file: {e}")
