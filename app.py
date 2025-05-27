@@ -25,7 +25,7 @@ def clean_demand_column(df):
     df['Demand'] = df['Demand'].apply(parse_demand)
     return df
 
-# Filter data for earlier or later period
+# Filter data for a given period
 def filter_period(df, country, campaign_input, start_date, end_date):
     df = df[df['Country'] == country]
     df = df[df['Description'].str.contains(campaign_input, case=False, na=False)]
@@ -56,17 +56,15 @@ if uploaded_file:
 
             campaign_input = st.text_input("🏷️ Campaign search phrase (min. 3 characters):")
 
-            st.markdown("### 📆 Define earlier and later periods")
+            st.markdown("### 📆 Earlier Period")
+            earlier_start = st.date_input("Start date (Earlier Period)", key="earlier_start")
+            earlier_end = st.date_input("End date (Earlier Period)", key="earlier_end")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                earlier_start = st.date_input("Earlier Period Start")
-                earlier_end = st.date_input("Earlier Period End")
-            with col2:
-                later_start = st.date_input("Later Period Start")
-                later_end = st.date_input("Later Period End")
+            percentage = st.number_input("📈 Target growth from Earlier Period (%)", min_value=0, max_value=100, value=0)
 
-            percentage = st.slider("📈 Target growth from Earlier Period (%)", min_value=0, max_value=100, value=0)
+            st.markdown("### 📆 Later Period")
+            later_start = st.date_input("Start date (Later Period)", key="later_start")
+            later_end = st.date_input("End date (Later Period)", key="later_end")
 
             if campaign_input and len(campaign_input) >= 3:
                 filtered_earlier = filter_period(df, selected_country, campaign_input, earlier_start, earlier_end)
@@ -108,8 +106,15 @@ if uploaded_file:
 
                         st.markdown("### 📘 Estimation formula:")
                         st.markdown(r"""
-                        Adjusted Earlier = Earlier Mean × (1 + percentage / 100)  
-                        Final Estimation = (Adjusted Earlier + Later Mean) / 2  
+                        #### Estymacja:
+
+                        $$
+                        \text{Adjusted Earlier} = \text{Earlier Mean} \times \left(1 + \frac{\text{percentage}}{100}\right)
+                        $$
+
+                        $$
+                        \text{Final Estimation} = \frac{\text{Adjusted Earlier} + \text{Later Mean}}{2}
+                        $$
                         """)
 
             else:
