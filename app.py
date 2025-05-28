@@ -68,7 +68,7 @@ def reorder_columns(df):
         return df[cols]
     return df
 
-st.title("\U0001F4CA Marketing Campaign Estimator")
+st.title("\U0001F4CA Campaign Estimator")
 
 uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
 
