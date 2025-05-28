@@ -82,8 +82,8 @@ if uploaded_file:
 
             # Kategoria
             categories = [
-                "Wäsche (Damen/Herren)", "Outdoor, Sport (Damen/Herren)", "Fashion", "DOB", 
-                "Designer (Damen)", "Herrenbekleidung", "Accessoires", "Baby-/Kinderbekleidung", 
+                "Wäsche (Damen/Herren)", "Outdoor, Sport (Damen/Herren)", 
+                "Fashion, DOB, Designer (Damen)", "Herrenbekleidung", "Accessoires", "Baby-/Kinderbekleidung", 
                 "Baby-/Kinderschuhe", "Babyausstattung", "Beauty (Parfum, Pflege, Kosmetik)", 
                 "Denim, Casual (Damen/Herren)", "Erwachsenenschuhe", "Heimtex", "Home and Living", 
                 "Kinderhartwaren (Sitze, Wägen, etc.)", "Möbel", "Schmuck", "Spielzeug", 
