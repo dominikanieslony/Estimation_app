@@ -24,17 +24,12 @@ def clean_demand_column(df):
     df['Demand'] = df['Demand'].apply(parse_demand)
     return df
 
-def filter_data(df, country, campaign_filter, start_date, end_date, selected_category=None):
+def filter_data(df, country, campaign_filter, start_date, end_date):
     df_filtered = df[df['Country'] == country].copy()
-
-    if selected_category and selected_category != "All":
-        df_filtered = df_filtered[df_filtered['Category_name'].str.contains(selected_category, case=False, na=False)]
-
     if campaign_filter and len(campaign_filter) >= 3:
         mask_desc = df_filtered['Description'].str.contains(campaign_filter, case=False, na=False)
         mask_camp = df_filtered['Campaign name'].str.contains(campaign_filter, case=False, na=False)
         df_filtered = df_filtered[mask_desc | mask_camp]
-
     df_filtered['Date Start'] = pd.to_datetime(df_filtered['Date Start'], dayfirst=True, errors='coerce')
     df_filtered['Date End'] = pd.to_datetime(df_filtered['Date End'], dayfirst=True, errors='coerce')
     df_filtered = df_filtered[
@@ -57,6 +52,7 @@ def estimate_demand(earlier_df, later_df, percentage):
         return (adjusted_earlier + later_mean) / 2
 
 def reorder_columns(df):
+    # Zachowaj kolejność kolumn z oryginalnego pliku, ale wstaw Description zaraz po Campaign name
     cols = df.columns.tolist()
     if 'Campaign name' in cols and 'Description' in cols:
         cols.remove('Description')
@@ -72,24 +68,13 @@ uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
 if uploaded_file:
     try:
         df = load_data(uploaded_file)
-        required_cols = {'Country', 'Description', 'Date Start', 'Date End', 'Demand', 'Campaign name', 'Category_name'}
+        required_cols = {'Country', 'Description', 'Date Start', 'Date End', 'Demand', 'Campaign name'}
         if not required_cols.issubset(df.columns):
             st.error(f"❌ Missing required columns: {required_cols - set(df.columns)}")
         else:
             df = clean_demand_column(df)
             country_list = df['Country'].dropna().unique().tolist()
             selected_country = st.selectbox("🌍 Select country:", country_list)
-
-            # Kategoria
-            categories = [
-                "Wäsche (Damen/Herren)", "Outdoor, Sport (Damen/Herren)", "Fashion", "DOB", 
-                "Designer (Damen)", "Herrenbekleidung", "Accessoires", "Baby-/Kinderbekleidung", 
-                "Baby-/Kinderschuhe", "Babyausstattung", "Beauty (Parfum, Pflege, Kosmetik)", 
-                "Denim, Casual (Damen/Herren)", "Erwachsenenschuhe", "Heimtex", "Home and Living", 
-                "Kinderhartwaren (Sitze, Wägen, etc.)", "Möbel", "Schmuck", "Spielzeug", 
-                "Technik", "Tierbedarf", "Tracht"
-            ]
-            selected_category = st.selectbox("🏷️ Select category:", ["All"] + categories)
 
             campaign_filter = st.text_input("🔎 Filter campaigns (contains, min 3 letters):")
 
@@ -104,8 +89,9 @@ if uploaded_file:
             later_start_date = st.date_input("Start date (Later Period):", key='later_start')
             later_end_date = st.date_input("End date (Later Period):", key='later_end')
 
-            earlier_filtered = filter_data(df, selected_country, campaign_filter, earlier_start_date, earlier_end_date, selected_category)
-            later_filtered = filter_data(df, selected_country, campaign_filter, later_start_date, later_end_date, selected_category)
+            # Filtrujemy dane po kraju, dacie i filtrze kampanii (jeden filtr dla obu okresów)
+            earlier_filtered = filter_data(df, selected_country, campaign_filter, earlier_start_date, earlier_end_date)
+            later_filtered = filter_data(df, selected_country, campaign_filter, later_start_date, later_end_date)
 
             earlier_filtered = reorder_columns(earlier_filtered)
             later_filtered = reorder_columns(later_filtered)
@@ -154,3 +140,4 @@ if uploaded_file:
                         )
     except Exception as e:
         st.error(f"❌ Error processing file: {e}")
+
