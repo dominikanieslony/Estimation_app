@@ -33,7 +33,8 @@ def filter_data(df, country, campaign_filter, start_date, end_date, selected_cat
 
     if selected_category and selected_category != "All":
         before_cat = len(df_filtered)
-        df_filtered = df_filtered[df_filtered['Category_name'].str.contains(selected_category, case=False, na=False)]
+        # Dokładne porównanie kategorii bez uwzględniania wielkości liter i spacji
+        df_filtered = df_filtered[df_filtered['Category_name'].str.strip().str.lower() == selected_category.strip().lower()]
         debug_logs.append(f"✅ After category filter ({selected_category}): {len(df_filtered)} / {before_cat} rows")
 
     if campaign_filter and len(campaign_filter) >= 3:
@@ -82,7 +83,6 @@ def reorder_columns(df):
         return df[cols]
     return df
 
-# --- STREAMLIT UI START ---
 st.title("\U0001F4CA Marketing Campaign Estimator")
 
 uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
@@ -95,11 +95,16 @@ if uploaded_file:
             st.error(f"❌ Missing required columns: {required_cols - set(df.columns)}")
         else:
             df = clean_demand_column(df)
+
+            # Dodaj podgląd dostępnych kategorii do debugowania
+            with st.expander("📋 Lista kategorii w danych"):
+                st.write(df['Category_name'].dropna().unique().tolist())
+
             country_list = df['Country'].dropna().unique().tolist()
             selected_country = st.selectbox("\U0001F30D Select country:", country_list)
 
             categories = df['Category_name'].dropna().unique().tolist()
-            categories.sort()
+            categories = sorted(categories)
             selected_category = st.selectbox("🏷️ Select category:", ["All"] + categories)
 
             campaign_filter = st.text_input("🔎 Filter campaigns (contains, min 3 letters):")
@@ -115,18 +120,9 @@ if uploaded_file:
             later_start_date = st.date_input("Start date (Later Period):", key='later_start')
             later_end_date = st.date_input("End date (Later Period):", key='later_end')
 
-            # 👇 Tu dodano debug=True
-            earlier_filtered = filter_data(
-                df, selected_country, campaign_filter,
-                earlier_start_date, earlier_end_date,
-                selected_category, debug=True
-            )
-
-            later_filtered = filter_data(
-                df, selected_country, campaign_filter,
-                later_start_date, later_end_date,
-                selected_category, debug=True
-            )
+            # Ustaw debug=True, żeby zobaczyć krok po kroku filtrowanie
+            earlier_filtered = filter_data(df, selected_country, campaign_filter, earlier_start_date, earlier_end_date, selected_category, debug=True)
+            later_filtered = filter_data(df, selected_country, campaign_filter, later_start_date, later_end_date, selected_category, debug=True)
 
             earlier_filtered = reorder_columns(earlier_filtered)
             later_filtered = reorder_columns(later_filtered)
