@@ -24,23 +24,40 @@ def clean_demand_column(df):
     df['Demand'] = df['Demand'].apply(parse_demand)
     return df
 
-def filter_data(df, country, campaign_filter, start_date, end_date, selected_category=None):
+def filter_data(df, country, campaign_filter, start_date, end_date, selected_category=None, debug=False):
+    debug_logs = []
+
+    original_count = len(df)
     df_filtered = df[df['Country'] == country].copy()
+    debug_logs.append(f"✅ After country filter ({country}): {len(df_filtered)} / {original_count} rows")
 
     if selected_category and selected_category != "All":
+        before_cat = len(df_filtered)
         df_filtered = df_filtered[df_filtered['Category_name'].str.contains(selected_category, case=False, na=False)]
+        debug_logs.append(f"✅ After category filter ({selected_category}): {len(df_filtered)} / {before_cat} rows")
 
     if campaign_filter and len(campaign_filter) >= 3:
+        before_text = len(df_filtered)
         mask_desc = df_filtered['Description'].str.contains(campaign_filter, case=False, na=False)
         mask_camp = df_filtered['Campaign name'].str.contains(campaign_filter, case=False, na=False)
         df_filtered = df_filtered[mask_desc | mask_camp]
+        debug_logs.append(f"✅ After text filter ('{campaign_filter}'): {len(df_filtered)} / {before_text} rows")
 
     df_filtered['Date Start'] = pd.to_datetime(df_filtered['Date Start'], dayfirst=True, errors='coerce')
     df_filtered['Date End'] = pd.to_datetime(df_filtered['Date End'], dayfirst=True, errors='coerce')
+
+    before_date = len(df_filtered)
     df_filtered = df_filtered[
         (df_filtered['Date Start'] >= pd.to_datetime(start_date)) &
         (df_filtered['Date End'] <= pd.to_datetime(end_date))
     ]
+    debug_logs.append(f"✅ After date filter: {len(df_filtered)} / {before_date} rows")
+
+    if debug:
+        with st.expander("🧪 Debug info"):
+            for log in debug_logs:
+                st.write(log)
+
     return df_filtered
 
 def estimate_demand(earlier_df, later_df, percentage):
@@ -65,6 +82,7 @@ def reorder_columns(df):
         return df[cols]
     return df
 
+# --- STREAMLIT UI START ---
 st.title("\U0001F4CA Marketing Campaign Estimator")
 
 uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
@@ -80,7 +98,6 @@ if uploaded_file:
             country_list = df['Country'].dropna().unique().tolist()
             selected_country = st.selectbox("\U0001F30D Select country:", country_list)
 
-            # Kategoria
             categories = df['Category_name'].dropna().unique().tolist()
             categories.sort()
             selected_category = st.selectbox("🏷️ Select category:", ["All"] + categories)
@@ -98,8 +115,18 @@ if uploaded_file:
             later_start_date = st.date_input("Start date (Later Period):", key='later_start')
             later_end_date = st.date_input("End date (Later Period):", key='later_end')
 
-            earlier_filtered = filter_data(df, selected_country, campaign_filter, earlier_start_date, earlier_end_date, selected_category)
-            later_filtered = filter_data(df, selected_country, campaign_filter, later_start_date, later_end_date, selected_category)
+            # 👇 Tu dodano debug=True
+            earlier_filtered = filter_data(
+                df, selected_country, campaign_filter,
+                earlier_start_date, earlier_end_date,
+                selected_category, debug=True
+            )
+
+            later_filtered = filter_data(
+                df, selected_country, campaign_filter,
+                later_start_date, later_end_date,
+                selected_category, debug=True
+            )
 
             earlier_filtered = reorder_columns(earlier_filtered)
             later_filtered = reorder_columns(later_filtered)
