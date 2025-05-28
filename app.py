@@ -65,7 +65,7 @@ def reorder_columns(df):
         return df[cols]
     return df
 
-st.title("📊 Marketing Campaign Estimator")
+st.title("\U0001F4CA Marketing Campaign Estimator")
 
 uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
 
@@ -78,17 +78,11 @@ if uploaded_file:
         else:
             df = clean_demand_column(df)
             country_list = df['Country'].dropna().unique().tolist()
-            selected_country = st.selectbox("🌍 Select country:", country_list)
+            selected_country = st.selectbox("\U0001F30D Select country:", country_list)
 
             # Kategoria
-            categories = [
-                "Wäsche (Damen/Herren)", "Outdoor, Sport (Damen/Herren)", 
-                "Fashion, DOB, Designer (Damen)", "Herrenbekleidung", "Accessoires", "Baby-/Kinderbekleidung", 
-                "Baby-/Kinderschuhe", "Babyausstattung", "Beauty (Parfum, Pflege, Kosmetik)", 
-                "Denim, Casual (Damen/Herren)", "Erwachsenenschuhe", "Heimtex", "Home and Living", 
-                "Kinderhartwaren (Sitze, Wägen, etc.)", "Möbel", "Schmuck", "Spielzeug", 
-                "Technik", "Tierbedarf", "Tracht"
-            ]
+            categories = df['Category_name'].dropna().unique().tolist()
+            categories.sort()
             selected_category = st.selectbox("🏷️ Select category:", ["All"] + categories)
 
             campaign_filter = st.text_input("🔎 Filter campaigns (contains, min 3 letters):")
@@ -125,7 +119,7 @@ if uploaded_file:
             earlier_selected_df = earlier_filtered.loc[[idx for idx, checked in earlier_selections.items() if checked]]
             later_selected_df = later_filtered.loc[[idx for idx, checked in later_selections.items() if checked]]
 
-            if st.button("📈 Calculate Estimation"):
+            if st.button("\U0001F4C8 Calculate Estimation"):
                 if earlier_selected_df.empty and later_selected_df.empty:
                     st.warning("⚠️ No campaigns selected in either period for estimation.")
                 elif later_selected_df.empty:
@@ -147,7 +141,7 @@ if uploaded_file:
                         combined_df = pd.concat([earlier_selected_df, later_selected_df]).drop_duplicates()
                         csv = combined_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="📥 Download selected campaigns data as CSV",
+                            label="\U0001F4E5 Download selected campaigns data as CSV",
                             data=csv,
                             file_name='campaign_estimation_data.csv',
                             mime='text/csv'
