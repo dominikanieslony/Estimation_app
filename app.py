@@ -25,11 +25,10 @@ def clean_demand_column(df):
     return df
 
 def filter_data(df, country, campaign_filter, start_date, end_date, selected_category=None):
-    original_count = len(df)
     df_filtered = df[df['Country'] == country].copy()
 
     if selected_category and selected_category != "All":
-        df_filtered = df_filtered[df_filtered['Category_name'].str.strip().str.lower() == selected_category.strip().lower()]
+        df_filtered = df_filtered[df_filtered['Category_name'].str.contains(selected_category, case=False, na=False)]
 
     if campaign_filter and len(campaign_filter) >= 3:
         mask_desc = df_filtered['Description'].str.contains(campaign_filter, case=False, na=False)
@@ -38,26 +37,25 @@ def filter_data(df, country, campaign_filter, start_date, end_date, selected_cat
 
     df_filtered['Date Start'] = pd.to_datetime(df_filtered['Date Start'], dayfirst=True, errors='coerce')
     df_filtered['Date End'] = pd.to_datetime(df_filtered['Date End'], dayfirst=True, errors='coerce')
-
     df_filtered = df_filtered[
         (df_filtered['Date Start'] >= pd.to_datetime(start_date)) &
         (df_filtered['Date End'] <= pd.to_datetime(end_date))
     ]
-
     return df_filtered
 
 def estimate_demand(earlier_df, later_df, percentage):
-    earlier_mean = earlier_df['Demand'].mean() if not earlier_df.empty else 0
-    later_mean = later_df['Demand'].mean() if not later_df.empty else 0
-    adjusted_earlier = earlier_mean * (1 + percentage / 100)
-    if earlier_df.empty and later_df.empty:
+    earlier_mean = earlier_df['Demand'].mean() if not earlier_df.empty else None
+    later_mean = later_df['Demand'].mean() if not later_df.empty else None
+
+    if earlier_mean is None and later_mean is None:
         return None
-    elif earlier_df.empty:
-        return later_mean
-    elif later_df.empty:
-        return adjusted_earlier
-    else:
+    elif earlier_mean is not None and later_mean is not None:
+        adjusted_earlier = earlier_mean * (1 + percentage / 100)
         return (adjusted_earlier + later_mean) / 2
+    elif earlier_mean is not None:
+        return earlier_mean * (1 + percentage / 100)
+    else:
+        return later_mean
 
 def reorder_columns(df):
     cols = df.columns.tolist()
@@ -68,7 +66,7 @@ def reorder_columns(df):
         return df[cols]
     return df
 
-st.title("\U0001F4CA Campaign Estimator")
+st.title("📊 Marketing Campaign Estimator")
 
 uploaded_file = st.file_uploader("Upload campaign data CSV file", type="csv")
 
@@ -80,12 +78,17 @@ if uploaded_file:
             st.error(f"❌ Missing required columns: {required_cols - set(df.columns)}")
         else:
             df = clean_demand_column(df)
-
             country_list = df['Country'].dropna().unique().tolist()
-            selected_country = st.selectbox("\U0001F30D Select country:", country_list)
+            selected_country = st.selectbox("🌍 Select country:", country_list)
 
-            categories = df['Category_name'].dropna().unique().tolist()
-            categories = sorted(categories)
+            categories = [
+                "Wäsche (Damen/Herren)", "Outdoor, Sport (Damen/Herren)", 
+                "Fashion, DOB, Designer (Damen)", "Herrenbekleidung", "Accessoires", "Baby-/Kinderbekleidung", 
+                "Baby-/Kinderschuhe", "Babyausstattung", "Beauty (Parfum, Pflege, Kosmetik)", 
+                "Denim, Casual (Damen/Herren)", "Erwachsenenschuhe", "Heimtex", "Home and Living", 
+                "Kinderhartwaren (Sitze, Wägen, etc.)", "Möbel", "Schmuck", "Spielzeug", 
+                "Technik", "Tierbedarf", "Tracht"
+            ]
             selected_category = st.selectbox("🏷️ Select category:", ["All"] + categories)
 
             campaign_filter = st.text_input("🔎 Filter campaigns (contains, min 3 letters):")
@@ -95,7 +98,7 @@ if uploaded_file:
             earlier_end_date = st.date_input("End date (Earlier Period):", key='earlier_end')
 
             st.subheader("📈 Target growth from Earlier Period (%)")
-            target_growth = st.number_input("Enter growth percentage (integer, no commas):", min_value=0, max_value=1000, step=1, format="%d")
+            target_growth = st.number_input("Enter growth percentage (can be negative):", min_value=-100, max_value=1000, step=1, format="%d")
 
             st.subheader("⏳ Later Period")
             later_start_date = st.date_input("Start date (Later Period):", key='later_start')
@@ -122,11 +125,9 @@ if uploaded_file:
             earlier_selected_df = earlier_filtered.loc[[idx for idx, checked in earlier_selections.items() if checked]]
             later_selected_df = later_filtered.loc[[idx for idx, checked in later_selections.items() if checked]]
 
-            if st.button("\U0001F4C8 Calculate Estimation"):
+            if st.button("📈 Calculate Estimation"):
                 if earlier_selected_df.empty and later_selected_df.empty:
                     st.warning("⚠️ No campaigns selected in either period for estimation.")
-                elif later_selected_df.empty:
-                    st.warning("⚠️ You must select at least one campaign from the Later Period.")
                 else:
                     estimation = estimate_demand(earlier_selected_df, later_selected_df, target_growth)
                     if estimation is None:
@@ -134,7 +135,6 @@ if uploaded_file:
                     else:
                         st.success(f"Estimated Demand: **{estimation:.2f} EUR**")
                         st.markdown("### Data used for estimation:")
-
                         st.write("Earlier Period Campaigns:")
                         st.dataframe(earlier_selected_df)
 
@@ -144,7 +144,7 @@ if uploaded_file:
                         combined_df = pd.concat([earlier_selected_df, later_selected_df]).drop_duplicates()
                         csv = combined_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="\U0001F4E5 Download selected campaigns data as CSV",
+                            label="📥 Download selected campaigns data as CSV",
                             data=csv,
                             file_name='campaign_estimation_data.csv',
                             mime='text/csv'
